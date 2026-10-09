@@ -20,11 +20,13 @@ public class ResponseTest
         var noul = new NoulAnswer(0.75);
         var choice = new ChoiceAnswer("yes", [], 0.9);
         var score = new ScoreAnswer(0.5, [], 0.8);
-        var response = new Response([new("noul", noul), new("choice", choice), new("score", score)]);
+        var usage = new Usage(120, 30);
+        var response = new Response([new("noul", noul), new("choice", choice), new("score", score)], usage);
 
         Assert.Same(noul, response.GetRequiredNoulAnswer("noul"));
         Assert.Same(choice, response.GetRequiredChoiceAnswer("choice"));
         Assert.Same(score, response.GetRequiredScoreAnswer("score"));
+        Assert.Same(usage, response.Usage);
     }
 
     /// <summary>
@@ -36,7 +38,7 @@ public class ResponseTest
     [InlineData("ScoreAnswer")]
     public void GetRequiredAnswer_MissingName_Throws(string type)
     {
-        var response = new Response([new("other", new NoulAnswer(0.5))]);
+        var response = new Response([new("other", new NoulAnswer(0.5))], new Usage(0, 0));
 
         var exception = Assert.Throws<InvalidOperationException>(() => GetRequiredAnswer(response, type, "missing"));
 
@@ -53,7 +55,7 @@ public class ResponseTest
     public void GetRequiredAnswer_WrongType_Throws(string type)
     {
         Answer answer = type == "NoulAnswer" ? new ChoiceAnswer("yes", [], 0.9) : new NoulAnswer(0.5);
-        var response = new Response([new("answer", answer)]);
+        var response = new Response([new("answer", answer)], new Usage(0, 0));
 
         var exception = Assert.Throws<InvalidOperationException>(() => GetRequiredAnswer(response, type, "answer"));
 
@@ -66,7 +68,8 @@ public class ResponseTest
     [Fact]
     public void GetRequiredChoiceAnswer_DuplicateNames_ValidatesFirstMatch()
     {
-        var response = new Response([new("answer", new NoulAnswer(0.5)), new("answer", new ChoiceAnswer("yes", [], 0.9))]);
+        var response = new Response([new("answer", new NoulAnswer(0.5)), new("answer", new ChoiceAnswer("yes", [], 0.9))],
+            new Usage(0, 0));
 
         var exception = Assert.Throws<InvalidOperationException>(() => response.GetRequiredChoiceAnswer("answer"));
 

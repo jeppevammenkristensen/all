@@ -62,7 +62,6 @@ public partial class JevRunner : IJevRunner
     /// <exception cref="JsonException">The response cannot be read as a JSON object or contains a null JSON response.</exception>
     public async Task<Response> Execute(Request request, CancellationToken cancellationToken = default)
     {
-        
         var json = JsonTranslator.CreateRequestJson(request);
         LogRequestJsonRequestjson(json);
         
@@ -93,7 +92,7 @@ public partial class JevRunner : IJevRunner
                                throw new JsonException("The API returned a null JSON response");
 
             var answersObject = responseJson["answers"]!.AsObject();
-            return new Response([.. Answer.From(answersObject)]);
+            return new Response([.. Answer.From(answersObject)], Usage.From(responseJson["usage"]!.AsObject()));
         }
         catch (Exception e)
         {

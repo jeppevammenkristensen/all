@@ -1,12 +1,21 @@
+using System.Text.Json.Nodes;
 using JRK.JevRunner.Responses;
 
 namespace JRK.JevRunner;
+
+public record Usage ( long InputTokens, long OutputTokens )
+{
+    public static Usage From(JsonObject asObject)
+    {
+        return new Usage(asObject["input_tokens"]!.GetValue<long>(), asObject["output_tokens"]!.GetValue<long>());
+    }
+}
 
 /// <summary>
 /// Contains named answers and provides required, typed answer lookups.
 /// </summary>
 /// <param name="Answers">The named answers searched by the typed lookup methods.</param>
-public record Response(List<AnswerWrapper> Answers)
+public record Response(List<AnswerWrapper> Answers, Usage Usage)
 {
     /// <summary>
     /// Returns the named noul answer, throwing if it is missing or has another type.

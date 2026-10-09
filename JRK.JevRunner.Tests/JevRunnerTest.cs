@@ -21,10 +21,10 @@ namespace JRK.JevRunner.Tests;
 public class JevRunnerTest
 {
     /// <summary>
-    /// The injected client receives an authenticated JSON request and its successful response supplies named answers.
+    /// The injected client receives an authenticated JSON request and its successful response supplies named answers and usage.
     /// </summary>
     [Fact]
-    public async Task Execute_Success_SubmitsRequestAndReturnsNamedAnswers()
+    public async Task Execute_Success_SubmitsRequestAndReturnsNamedAnswersAndUsage()
     {
         using var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
         httpResponse.Content = new StringContent("""
@@ -37,7 +37,8 @@ public class JevRunnerTest
                                                        "probabilities": { "urgent": 0.8, "normal": 0.2 },
                                                        "confidence": 0.9
                                                      }
-                                                   }
+                                                   },
+                                                   "usage": { "input_tokens": 120, "output_tokens": 30 }
                                                  }
                                                  """, Encoding.UTF8, "application/json");
         var callCount = 0;
@@ -78,6 +79,36 @@ public class JevRunnerTest
         Assert.Equal("urgent", priority.Choice);
         Assert.Equal(0.9, priority.Confidence.Value);
         Assert.Equal(2, priority.Probabilities.Length);
+        Assert.Equal(new Usage(120, 30), response.Usage);
+    }
+
+    /// <summary>
+    /// Usage is parsed from snake-case fields as 64-bit counts, even when no answers are returned.
+    /// </summary>
+    [Theory]
+    [InlineData(0L, 0L)]
+    [InlineData(120L, 30L)]
+    [InlineData(2147483648L, 4294967296L)]
+    public async Task Execute_EmptyAnswers_DeserializesUsage(long inputTokens, long outputTokens)
+    {
+        using var httpResponse = new HttpResponseMessage(HttpStatusCode.OK);
+        httpResponse.Content = new StringContent($$"""
+                                                 {
+                                                   "answers": {},
+                                                   "usage": {
+                                                     "input_tokens": {{inputTokens}},
+                                                     "output_tokens": {{outputTokens}}
+                                                   }
+                                                 }
+                                                 """, Encoding.UTF8, "application/json");
+        using var client = new HttpClient(new FakeHttpMessageHandler((_, _) => Task.FromResult(httpResponse)));
+        var runner = CreateRunner(client);
+
+        var response = await runner.Execute(CreateRequest(), TestContext.Current.CancellationToken);
+
+        Assert.Empty(response.Answers);
+        Assert.Equal(inputTokens, response.Usage.InputTokens);
+        Assert.Equal(outputTokens, response.Usage.OutputTokens);
     }
 
     /// <summary>

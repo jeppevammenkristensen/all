@@ -1,0 +1,5 @@
+<Solution>
+   <Project Path="JRK.JevRunner.Core.Tests/JRK.JevRunner.Tests.csproj" />
+   <Project Path="JRK.JevRunner/JRK.JevRunner.csproj" />
+   <Project Path="Playground/Playground.csproj" />  
+</Solution>

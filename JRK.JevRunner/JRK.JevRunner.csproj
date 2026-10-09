@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>JRK.JevRunner</RootNamespace>
+    <PackageId>JRK.JevRunner</PackageId>
+    <Version>0.0.1</Version>
+    <Title>JRK JevRunner</Title>
+    <Authors>Jeppe Roi Kristensen</Authors>
+    <Description>Unofficial .NET client for Jev and the TypeSafe System One API. Submit application state and named questions, and consume typed responses.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="JRK.JevRunner.Tests" />
+  </ItemGroup> 
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

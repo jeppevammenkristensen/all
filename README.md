@@ -1,5 +1,7 @@
 # JRK.JevRunner
 
+[NuGet package](https://www.nuget.org/packages/JRK.JevRunner)
+
 An unofficial .NET client for Jev and the TypeSafe System One API. Submit application state and named questions, and consume typed responses.
 
 ## Requirements
@@ -34,7 +36,7 @@ var response = await runner.Execute(request);
 Console.WriteLine(response.GetRequiredNoulAnswer("dog_was_jumped_over"));
 ```
 
-The package uses the `JRK.JevRunner.Core` namespaces. You can also supply an `HttpClient` and an `ILogger<JevRunner>` through the `JevRunner` constructor.
+This package is targeting C# 15 and dotnet sdk which is currently in the time of writing in preview
 
 ## License
 

@@ -10,8 +10,13 @@
     <Title>JRK JevRunner</Title>
     <Authors>Jeppe Roi Kristensen</Authors>
     <Description>Unofficial .NET client for Jev and the TypeSafe System One API. Submit application state and named questions, and consume typed responses.</Description>
+    <PackageTags>jev;typesafe;ai;system-one;api-client;dotnet</PackageTags>
+    <PackageProjectUrl>https://github.com/jeppevammenkristensen/all</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jeppevammenkristensen/all</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>Runner-Icon.png</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +26,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Update="assets\Runner-Icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

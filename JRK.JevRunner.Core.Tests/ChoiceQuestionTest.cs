@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 using JRK.JevRunner.Requests;
 using Xunit;
 
-namespace JevRunner.Core.Tests;
+namespace JRK.JevRunner.Tests;
 
 /// <summary>
 /// Verifies choice-question serialization and insertion into named question objects.

@@ -1,10 +1,9 @@
 using System;
 using JetBrains.Annotations;
-using JRK.JevRunner;
 using JRK.JevRunner.Responses;
 using Xunit;
 
-namespace JevRunner.Core.Tests;
+namespace JRK.JevRunner.Tests;
 
 /// <summary>
 /// Verifies required answer lookups and their failure contracts for every answer type.

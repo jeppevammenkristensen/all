@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>JRK.JevRunner</RootNamespace>
     <PackageId>JRK.JevRunner</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Title>JRK JevRunner</Title>
     <Authors>Jeppe Roi Kristensen</Authors>
     <Description>Unofficial .NET client for Jev and the TypeSafe System One API. Submit application state and named questions, and consume typed responses.</Description>
@@ -26,7 +26,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\LICENSE" Pack="true" PackagePath="\" />
-    <None Update="assets\Runner-Icon.png" Pack="true" PackagePath="\" />
+    <None Update="assets\Runner-Icon.png" Pack="true" PackagePath="Runner-Icon.png" />
   </ItemGroup>
 
 </Project>

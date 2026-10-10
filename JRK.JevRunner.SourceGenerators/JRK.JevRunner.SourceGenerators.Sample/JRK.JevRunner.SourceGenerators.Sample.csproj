@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net11.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <RootNamespace>JRK.JevRunner.SourceGenerators.Sample</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(UsePackedJevRunner)' == 'true'">
+        <JevRunnerPackageVersion Condition="'$(JevRunnerPackageVersion)' == ''">0.1.0</JevRunnerPackageVersion>
+        <RestoreAdditionalProjectSources>$(MSBuildThisFileDirectory)..\..\JRK.JevRunner\bin\$(Configuration);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
+        <!-- Isolate package smoke builds from cached published packages with the same version. -->
+        <RestorePackagesPath>$(MSBuildThisFileDirectory)obj\package-smoke</RestorePackagesPath>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(UsePackedJevRunner)' != 'true'">
+        <ProjectReference Include="..\..\JRK.JevRunner\JRK.JevRunner.csproj" />
+        <!-- Analyzer project references are not transitive; NuGet consumers only need JRK.JevRunner. -->
+        <ProjectReference Include="..\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(UsePackedJevRunner)' == 'true'">
+        <!-- No explicit analyzer reference: the runtime NuGet must supply it. -->
+        <PackageReference Include="JRK.JevRunner" Version="$(JevRunnerPackageVersion)" />
+    </ItemGroup>
+
+</Project>

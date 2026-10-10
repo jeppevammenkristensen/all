@@ -1,4 +1,10 @@
 <Solution>
+   <Folder Name="/SourceGenerators/" >
+      <Project Path="JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators.Sample/JRK.JevRunner.SourceGenerators.Sample.csproj" />
+      <Project Path="JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators.Tests/JRK.JevRunner.SourceGenerators.Tests.csproj" />
+      <Project Path="JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators.csproj" />   
+   </Folder>
+   
    <Project Path="JRK.JevRunner.Tests/JRK.JevRunner.Tests.csproj" />
    <Project Path="JRK.JevRunner/JRK.JevRunner.csproj" />
    <Project Path="Playground/Playground.csproj" />  

@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="JRK.JevRunner.Tests" />
+    <ProjectReference Include="..\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup> 
 
   <ItemGroup>
@@ -29,5 +31,20 @@
     <None Include="..\LICENSE" Pack="true" PackagePath="\" />
     <None Update="assets\Runner-Icon.png" Pack="true" PackagePath="Runner-Icon.png" />
   </ItemGroup>
+
+  <!-- Resolve the generator's actual output path, including custom output configurations.
+       The project reference builds it normally; packing without a build requires existing output. -->
+  <Target Name="IncludeSourceGeneratorInPackage" BeforeTargets="_GetPackageFiles">
+    <MSBuild Projects="..\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators.csproj"
+             Targets="GetTargetPath" Properties="Configuration=$(Configuration)"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;SelfContained">
+      <Output TaskParameter="TargetOutputs" ItemName="_SourceGeneratorPackageOutput" />
+    </MSBuild>
+    <Error Condition="!Exists('%(_SourceGeneratorPackageOutput.Identity)')"
+           Text="Build JRK.JevRunner before packing with --no-build: source generator output is missing." />
+    <ItemGroup>
+      <None Include="@(_SourceGeneratorPackageOutput)" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
 
 </Project>

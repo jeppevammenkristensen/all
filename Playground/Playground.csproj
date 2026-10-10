@@ -13,6 +13,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\JRK.JevRunner\JRK.JevRunner.csproj" />
+      <ProjectReference Include="..\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators\JRK.JevRunner.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
 </Project>

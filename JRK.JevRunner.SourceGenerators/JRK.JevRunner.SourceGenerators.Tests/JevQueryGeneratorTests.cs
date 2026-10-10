@@ -59,10 +59,11 @@ public class JevQueryGeneratorTests
                                                   public BudgetQuestion @event { get; } = new();
                                               }
 
-                                              [JRK.JevRunner.Annotation.NoulQuestion]
-                                              public class BudgetQuestion
+                                              public class BudgetQuestion : JRK.JevRunner.Annotation.INoulQuestionDefinition<string>
                                               {
                                                   public string Instructions => "Is the budget sufficient?";
+                                                  public string Yes => null;
+                                                  public string No => null;
                                               }
                                           }
 
@@ -107,10 +108,11 @@ public class JevQueryGeneratorTests
                                                 }
                                             }
 
-                                            [JRK.JevRunner.Annotation.NoulQuestion]
-                                            public class Question
+                                            public class Question : JRK.JevRunner.Annotation.INoulQuestionDefinition<string>
                                             {
                                                 public string Instructions => "instructions";
+                                                public string Yes => null;
+                                                public string No => null;
                                             }
                                         }
                                         """);
@@ -168,19 +170,21 @@ public class JevQueryGeneratorTests
     }
 
     [Theory]
-    [InlineData("UnknownQuestion")]
-    [InlineData("OddMarker")]
-    [InlineData("NoulQuestion, UnknownQuestion")]
-    public void UnsupportedQuestionMarkerReportsJev003(string marker)
+    [InlineData("INoulQuestionDefinition<string>, IScoreQuestionDefinition<string>")]
+    [InlineData("INoulQuestionDefinition<string>, INoulQuestionDefinition<object>")]
+    [InlineData("IChoiceQuestionDefinition<string>, IScoreQuestionDefinition<string>")]
+    public void AmbiguousQuestionInterfacesReportJev003(string interfaces)
     {
-        var diagnostic = AssertRejected(QuerySource(marker: marker) + """
-
-                                                                      namespace JRK.JevRunner.Annotation
-                                                                      {
-                                                                          public sealed class UnknownQuestionAttribute : System.Attribute, IQuestionAttribute { }
-                                                                          public sealed class OddMarkerAttribute : System.Attribute, IQuestionAttribute { }
-                                                                      }
-                                                                      """, "JEV003");
+        var diagnostic = AssertRejected(QuerySource(interfaces: interfaces, instructions: """
+                public string Instructions => "instructions";
+                object INoulQuestionDefinition<object>.Instructions => "other instructions";
+                public string[] Criterias => new string[0];
+                public JRK.JevRunner.Requests.ChoiceCriteria[] Choices => new JRK.JevRunner.Requests.ChoiceCriteria[0];
+                """.Replace("object INoulQuestionDefinition<object>.Instructions => \"other instructions\";",
+                interfaces.Contains("INoulQuestionDefinition<object>")
+                    ? "object INoulQuestionDefinition<object>.Instructions => \"other instructions\";"
+                    : "")),
+            "JEV003", assertCompiles: true);
 
         Assert.Contains("Budget", diagnostic.GetMessage());
     }
@@ -226,28 +230,27 @@ public class JevQueryGeneratorTests
                                                   {{(score ? "public ComfortQuestion __jevQuestion1 { get; } = new();" : "")}}
                                               }
 
-                                              [JRK.JevRunner.Annotation.NoulQuestion]
-                                              public class BudgetQuestion
+                                              public class BudgetQuestion : JRK.JevRunner.Annotation.INoulQuestionDefinition<string>
                                               {
                                                   public string Instructions => "Is the budget sufficient?";
+                                                  public string Yes => null;
+                                                  public string No => null;
                                               }
 
-                                              [JRK.JevRunner.Annotation.ChoiceQuestion]
-                                              public class DestinationQuestion
+                                              public class DestinationQuestion : JRK.JevRunner.Annotation.IChoiceQuestionDefinition<string>
                                               {
                                                   public string Instructions => "Choose a destination.";
-                                                  public System.Collections.Generic.IEnumerable<JRK.JevRunner.Requests.ChoiceCriteria> Choices
+                                                  public JRK.JevRunner.Requests.ChoiceCriteria[] Choices
                                                       => new JRK.JevRunner.Requests.ChoiceCriteria[]
                                                       {
                                                           new("city", "Prefer museums."), new("coast", "Prefer beaches.")
                                                       };
                                               }
 
-                                              [JRK.JevRunner.Annotation.ScoreQuestion]
-                                              public class ComfortQuestion
+                                              public class ComfortQuestion : JRK.JevRunner.Annotation.IScoreQuestionDefinition<string>
                                               {
                                                   public string Instructions => "Rate comfort.";
-                                                  public System.Collections.Generic.IEnumerable<string> Criterias
+                                                  public string[] Criterias
                                                       => new string[] { "basic", "comfortable", "luxurious" };
                                               }
                                           }
@@ -330,19 +333,19 @@ public class JevQueryGeneratorTests
     [Theory]
     [InlineData("ChoiceQuestion", "Choices", "")]
     [InlineData("ScoreQuestion", "Criterias", "")]
-    [InlineData("ChoiceQuestion", "Choices", "public string[] Choices;")]
+    [InlineData("ChoiceQuestion", "Choices", "public JRK.JevRunner.Requests.ChoiceCriteria[] Choices;")]
     [InlineData("ScoreQuestion", "Criterias", "public string[] Criterias;")]
-    [InlineData("ChoiceQuestion", "Choices", "public static string[] Choices => new string[0];")]
+    [InlineData("ChoiceQuestion", "Choices", "public static JRK.JevRunner.Requests.ChoiceCriteria[] Choices => new JRK.JevRunner.Requests.ChoiceCriteria[0];")]
     [InlineData("ScoreQuestion", "Criterias", "public static string[] Criterias => new string[0];")]
-    [InlineData("ChoiceQuestion", "Choices", "public string[] Choices { set { } }")]
+    [InlineData("ChoiceQuestion", "Choices", "public JRK.JevRunner.Requests.ChoiceCriteria[] Choices { set { } }")]
     [InlineData("ScoreQuestion", "Criterias", "public string[] Criterias { set { } }")]
-    [InlineData("ChoiceQuestion", "Choices", "private string[] Choices => new string[0];")]
+    [InlineData("ChoiceQuestion", "Choices", "private JRK.JevRunner.Requests.ChoiceCriteria[] Choices => new JRK.JevRunner.Requests.ChoiceCriteria[0];")]
     [InlineData("ScoreQuestion", "Criterias", "private string[] Criterias => new string[0];")]
-    [InlineData("ChoiceQuestion", "Choices", "public string[] Choices { private get; set; }")]
+    [InlineData("ChoiceQuestion", "Choices", "public JRK.JevRunner.Requests.ChoiceCriteria[] Choices { private get; set; }")]
     [InlineData("ScoreQuestion", "Criterias", "public string[] Criterias { private get; set; }")]
-    public void MissingOrUnreadableConfigurationReportsJev002(string marker, string property, string member)
+    public void MissingOrUnreadableInterfaceImplementationReportsJev002(string kind, string property, string member)
     {
-        var diagnostic = AssertRejected(QuerySource(marker: marker,
+        var diagnostic = AssertRejected(QuerySource(interfaces: "I" + kind + "Definition<string>",
             instructions: "public string Instructions => \"instructions\"; " + member), "JEV002");
 
         Assert.Contains(property, diagnostic.GetMessage());
@@ -357,21 +360,224 @@ public class JevQueryGeneratorTests
     [InlineData("ScoreQuestion", "Criterias", "object[]")]
     [InlineData("ScoreQuestion", "Criterias", "string")]
     [InlineData("ScoreQuestion", "Criterias", "int")]
-    public void IncompatibleConfigurationCollectionReportsJev004(string marker, string property, string type)
+    public void IncompatibleConfigurationFailsInterfaceContract(string kind, string property, string type)
     {
-        AssertRejected(QuerySource(marker: marker,
+        AssertRejected(QuerySource(interfaces: "I" + kind + "Definition<string>",
                 instructions: $"public string Instructions => \"instructions\"; public {type} {property} => default;"),
-            "JEV004");
+            "JEV002");
     }
 
     [Theory]
     [InlineData("ChoiceQuestion")]
     [InlineData("ScoreQuestion")]
-    public void ConfiguredQuestionRequiresInstructions(string marker)
+    public void ConfiguredQuestionRequiresInstructions(string kind)
     {
-        var diagnostic = AssertRejected(QuerySource(marker: marker, instructions: ""), "JEV002");
+        var diagnostic = AssertRejected(QuerySource(interfaces: "I" + kind + "Definition<string>", instructions: ""),
+            "JEV002");
 
         Assert.Contains("Instructions", diagnostic.GetMessage());
+    }
+
+    [Theory]
+    [InlineData("Noul", "BudgetQuestion")]
+    [InlineData("Noul", "BaseQuestion")]
+    [InlineData("Noul", "IQuestion")]
+    [InlineData("Noul", "JRK.JevRunner.Annotation.INoulQuestionDefinition<string>")]
+    [InlineData("Choice", "BudgetQuestion")]
+    [InlineData("Choice", "IQuestion")]
+    [InlineData("Choice", "JRK.JevRunner.Annotation.IChoiceQuestionDefinition<string>")]
+    [InlineData("Score", "BudgetQuestion")]
+    [InlineData("Score", "IQuestion")]
+    [InlineData("Score", "JRK.JevRunner.Annotation.IScoreQuestionDefinition<string>")]
+    public void InheritedAndInterfaceTypedDefinitionsUseExplicitMembers(string kind, string propertyType)
+    {
+        var contract = $"JRK.JevRunner.Annotation.I{kind}QuestionDefinition<string>";
+        var configuration = kind switch
+        {
+            "Noul" => $"string {contract}.Yes => \"yes\"; string {contract}.No => \"no\";",
+            "Choice" =>
+                $"JRK.JevRunner.Requests.ChoiceCriteria[] {contract}.Choices => new JRK.JevRunner.Requests.ChoiceCriteria[] {{ new(\"city\", \"Museums\") }};",
+            _ => $"string[] {contract}.Criterias => new[] {{ \"comfort\" }};"
+        };
+        var assertion = kind switch
+        {
+            "Noul" => "question.Criteria.TrueDefinition == \"yes\" && question.Criteria.FalseDefinition == \"no\"",
+            "Choice" => "question.Choices.Count == 1 && question.Choices[0].Choice == \"city\"",
+            _ => "question.Criterias.Count == 1 && question.Criterias[0] == \"comfort\""
+        };
+        var (result, output) = Generate($$"""
+                                          public interface IQuestion : {{contract}} { }
+                                          public class BaseQuestion : IQuestion
+                                          {
+                                              public int Instructions => 42;
+                                              string {{contract}}.Instructions => "interface instructions";
+                                              {{configuration}}
+                                          }
+                                          public class BudgetQuestion : BaseQuestion { }
+                                          [JRK.JevRunner.Annotation.JevQuery]
+                                          public partial class Query
+                                          {
+                                              public string State => "state";
+                                              public string JevModel => "model";
+                                              public {{propertyType}} Budget { get; } = new BudgetQuestion();
+                                          }
+                                          public static class Consumer
+                                          {
+                                              public static bool Verify()
+                                              {
+                                                  var question = new Query().GetRequest().Questions[0];
+                                                  return question.Name == "Budget" && question.Instructions == "interface instructions" && {{assertion}};
+                                              }
+                                          }
+                                          """);
+
+        var generated = AssertSuccessful(result, output);
+        Assert.Contains($"(global::{contract})this.@Budget", generated);
+        AssertConsumerSucceeds(output);
+    }
+
+    [Theory]
+    [InlineData("Noul")]
+    [InlineData("Choice")]
+    [InlineData("Score")]
+    public void GenericQuestionConstrainedToDefinitionInterfaceIsSupported(string kind)
+    {
+        var (result, output) = Generate($$"""
+                                          [JRK.JevRunner.Annotation.JevQuery]
+                                          public partial class Query<T> where T : JRK.JevRunner.Annotation.I{{kind}}QuestionDefinition<string>
+                                          {
+                                              public string State => "state";
+                                              public string JevModel => "model";
+                                              public T Budget { get; set; }
+                                          }
+                                          """);
+
+        var generated = AssertSuccessful(result, output);
+        Assert.Contains($"global::JRK.JevRunner.Responses.{kind}Answer @GetBudgetAnswer", generated);
+    }
+
+    [Fact]
+    public void StructuralAndSameNamedInterfaceLookalikesAreIgnored()
+    {
+        var (result, output) = Generate("""
+                                        namespace Other
+                                        {
+                                            public interface INoulQuestionDefinition<T> { T Instructions { get; } }
+                                            public class Lookalike : INoulQuestionDefinition<string>
+                                            { public string Instructions => "ignored"; }
+                                        }
+                                        public class Structural
+                                        {
+                                            public string Instructions => "ignored";
+                                            public string Yes => "yes";
+                                            public string No => "no";
+                                        }
+                                        [JRK.JevRunner.Annotation.JevQuery]
+                                        public partial class Query
+                                        {
+                                            public string State => "state";
+                                            public string JevModel => "model";
+                                            public Other.Lookalike Fake { get; } = new();
+                                            public Structural Other { get; } = new();
+                                        }
+                                        public static class Consumer
+                                        { public static bool Verify() => new Query().GetRequest().Questions.Count == 0; }
+                                        """);
+
+        var generated = AssertSuccessful(result, output);
+        Assert.DoesNotContain("Answer", generated);
+        AssertConsumerSucceeds(output);
+    }
+
+    [Theory]
+    [InlineData("yes", "no")]
+    [InlineData(null, null)]
+    [InlineData("yes", null)]
+    [InlineData(null, "no")]
+    [InlineData("", null)]
+    [InlineData(null, "")]
+    [InlineData("", "")]
+    public void NoulCriteriaAreGeneratedOnlyWhenBothDescriptionsAreNonNull(string? yes, string? no)
+    {
+        static string Literal(string? value) => value == null ? "null" : "\"" + value + "\"";
+        var source = QuerySource().Replace("public string Yes => null;", $"public string Yes => {Literal(yes)};")
+            .Replace("public string No => null;", $"public string No => {Literal(no)};");
+        var assertion = yes == null || no == null
+            ? "question.Criteria == null"
+            : $"question.Criteria != null && question.Criteria.TrueDefinition == {Literal(yes)} && question.Criteria.FalseDefinition == {Literal(no)}";
+        var (result, output) = Generate(source + $$"""
+                                                   public static class Consumer
+                                                   {
+                                                       public static bool Verify()
+                                                       {
+                                                           var question = new TestNamespace.TravelQuery().GetRequest().Questions[0];
+                                                           return {{assertion}};
+                                                       }
+                                                   }
+                                                   """);
+
+        var generated = AssertSuccessful(result, output);
+        Assert.Contains(" != null && ", generated);
+        Assert.Contains(".@AddYesNo(", generated);
+        Assert.DoesNotContain(".@Criteria =", generated);
+        AssertConsumerSucceeds(output);
+    }
+
+    [Fact]
+    public void InheritedAmbiguousDefinitionsReportJev003()
+    {
+        AssertRejected(QuerySource(interfaces: "IBoth", instructions: """
+            public string Instructions => "instructions";
+            public string[] Criterias => new string[0];
+            """) + """
+            namespace TestNamespace
+            {
+                public interface IBoth : JRK.JevRunner.Annotation.INoulQuestionDefinition<string>,
+                    JRK.JevRunner.Annotation.IScoreQuestionDefinition<string> { }
+            }
+            """, "JEV003", assertCompiles: true);
+    }
+
+    [Fact]
+    public void DiamondInheritanceOfSameConstructionIsNotAmbiguous()
+    {
+        var (result, output) = Generate(QuerySource(interfaces: "IBoth") + """
+            namespace TestNamespace
+            {
+                public interface ILeft : JRK.JevRunner.Annotation.INoulQuestionDefinition<string> { }
+                public interface IRight : JRK.JevRunner.Annotation.INoulQuestionDefinition<string> { }
+                public interface IBoth : ILeft, IRight { }
+            }
+            """);
+
+        AssertSuccessful(result, output);
+    }
+
+    [Theory]
+    [InlineData("public static BudgetQuestion Budget { get; } = new();")]
+    [InlineData("public BudgetQuestion Budget { set { } }")]
+    [InlineData("public BudgetQuestion this[int index] => new();")]
+    public void UnreadableQuestionPropertyReportsJev002(string property)
+    {
+        AssertRejected(QuerySource(questionProperty: property), "JEV002");
+    }
+
+    [Fact]
+    public void IncompatibleInstructionTypeReportsJev004()
+    {
+        AssertRejected(QuerySource(interfaces: "INoulQuestionDefinition<int>",
+            instructions: "public int Instructions => 42;"), "JEV004");
+    }
+
+    [Theory]
+    [InlineData("NoulQuestionBuilder", "MissingNoulBuilder")]
+    [InlineData("NoulAnswer", "MissingNoulAnswer")]
+    [InlineData("GetRequiredNoulAnswer", "MissingNoulAccessor")]
+    public void MissingExplicitRuntimeMappingReportsJev003(string original, string replacement)
+    {
+        var (result, _) = Generate(QuerySource(), RuntimeContract.Replace(original, replacement));
+        Assert.Empty(Assert.Single(result.Results).GeneratedSources);
+        Assert.Equal("JEV003", Assert.Single(result.Diagnostics).Id);
     }
 
     private static string QuerySource(
@@ -379,37 +585,40 @@ public class JevQueryGeneratorTests
         string state = "public string State => \"travel state\";",
         string model = "public string JevModel => \"jev-latest\";",
         string instructions = "public string Instructions => \"Is the budget sufficient?\";",
-        string marker = "NoulQuestion",
-        string extraMember = "") => $$"""
-                                      namespace TestNamespace
-                                      {
-                                          using JRK.JevRunner.Annotation;
+        string interfaces = "INoulQuestionDefinition<string>",
+        string extraMember = "",
+        string questionProperty = "public BudgetQuestion Budget { get; } = new();") => $$"""
+          namespace TestNamespace
+          {
+              using JRK.JevRunner.Annotation;
 
-                                          [JevQuery]
-                                          public {{declaration}} TravelQuery
-                                          {
-                                              {{state}}
-                                              {{model}}
-                                              public BudgetQuestion Budget { get; } = new();
-                                              {{extraMember}}
-                                          }
+              [JevQuery]
+              public {{declaration}} TravelQuery
+              {
+                  {{state}}
+                  {{model}}
+                  {{questionProperty}}
+                  {{extraMember}}
+              }
 
-                                          [{{marker}}]
-                                          public class BudgetQuestion
-                                          {
-                                              {{instructions}}
-                                          }
-                                      }
-                                      """;
+              public class BudgetQuestion : {{interfaces}}
+              {
+                  {{instructions}}
+                  public string Yes => null;
+                  public string No => null;
+              }
+          }
+          """;
 
-    private static (GeneratorDriverRunResult Result, Compilation Output) Generate(string source)
+    private static (GeneratorDriverRunResult Result, Compilation Output) Generate(string source,
+        string runtimeContract = RuntimeContract)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         var compilation = CSharpCompilation.Create("JevQueryTests_" + Guid.NewGuid().ToString("N"),
             new[]
             {
-                CSharpSyntaxTree.ParseText(RuntimeContract, parseOptions, cancellationToken: cancellationToken),
+                CSharpSyntaxTree.ParseText(runtimeContract, parseOptions, cancellationToken: cancellationToken),
                 CSharpSyntaxTree.ParseText(source, parseOptions, path: "Query.cs", cancellationToken: cancellationToken)
             },
             new[]
@@ -441,9 +650,12 @@ public class JevQueryGeneratorTests
         return generated.SourceText.ToString();
     }
 
-    private static Diagnostic AssertRejected(string source, string diagnosticId)
+    private static Diagnostic AssertRejected(string source, string diagnosticId, bool assertCompiles = false)
     {
-        var (result, _) = Generate(source);
+        var (result, output) = Generate(source);
+        if (assertCompiles)
+            Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         var generatorResult = Assert.Single(result.Results);
         Assert.Null(generatorResult.Exception);
         Assert.Empty(generatorResult.GeneratedSources);
@@ -472,13 +684,12 @@ public class JevQueryGeneratorTests
                                            {
                                                [System.AttributeUsage(System.AttributeTargets.Class)]
                                                public sealed class JevQueryAttribute : System.Attribute { }
-                                               public interface IQuestionAttribute { }
-                                               [System.AttributeUsage(System.AttributeTargets.Class)]
-                                               public sealed class NoulQuestionAttribute : System.Attribute, IQuestionAttribute { }
-                                               [System.AttributeUsage(System.AttributeTargets.Class)]
-                                               public sealed class ChoiceQuestionAttribute : System.Attribute, IQuestionAttribute { }
-                                               [System.AttributeUsage(System.AttributeTargets.Class)]
-                                               public sealed class ScoreQuestionAttribute : System.Attribute, IQuestionAttribute { }
+                                               public interface INoulQuestionDefinition<out T>
+                                               { T Instructions { get; } string Yes { get; } string No { get; } }
+                                               public interface IChoiceQuestionDefinition<out T>
+                                               { T Instructions { get; } Requests.ChoiceCriteria[] Choices { get; } }
+                                               public interface IScoreQuestionDefinition<out T>
+                                               { T Instructions { get; } string[] Criterias { get; } }
                                            }
 
                                            namespace JRK.JevRunner
@@ -514,6 +725,7 @@ public class JevQueryGeneratorTests
                                                    public Question(string name, string instructions) { Name = name; Instructions = instructions; }
                                                    public string Name { get; }
                                                    public string Instructions { get; }
+                                                   public YesNo Criteria { get; set; }
                                                    public System.Collections.Generic.List<ChoiceCriteria> Choices { get; } = new();
                                                    public System.Collections.Generic.List<string> Criterias { get; } = new();
                                                }
@@ -529,8 +741,13 @@ public class JevQueryGeneratorTests
                                                public sealed class NoulQuestionBuilder : QuestionBuilder
                                                {
                                                    public NoulQuestionBuilder(string name, string instructions) : base(name, instructions) { }
-                                                   public override Question Build() => new Question(Name, Instructions);
+                                                   public YesNo Criteria { get; set; }
+                                                   public NoulQuestionBuilder AddYesNo(string yes, string no)
+                                                   { Criteria = new YesNo(yes, no); return this; }
+                                                   public override Question Build() => new Question(Name, Instructions) { Criteria = Criteria };
                                                }
+
+                                               public sealed record YesNo(string TrueDefinition, string FalseDefinition);
 
                                                public sealed class ChoiceQuestionBuilder : QuestionBuilder
                                                {

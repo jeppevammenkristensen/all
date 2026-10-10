@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using JRK.JevRunner.Annotation;
 using JRK.JevRunner.Requests;
 using JRK.JevRunner.Responses;
@@ -35,20 +34,20 @@ public partial class BudgetQuery
     public ComfortQuestion Comfort { get; } = new();
 }
 
-/// <summary>Provides the instructions for a noul question.</summary>
-[NoulQuestion]
-public class BudgetQuestion
+/// <summary>Provides instructions and yes/no criteria for a noul question.</summary>
+public class BudgetQuestion : INoulQuestionDefinition<JevMessage>
 {
     public JevMessage Instructions => "Is the budget sufficient for travel, accommodation, and meals?";
+    public string? Yes => "The total cost of travel, accommodation, and meals is within 500 EUR.";
+    public string? No => "The total cost exceeds 500 EUR.";
 }
 
 /// <summary>Provides instructions and ordered selection criteria for a choice question.</summary>
-[ChoiceQuestion]
-public class DestinationQuestion
+public class DestinationQuestion : IChoiceQuestionDefinition<JevMessage>
 {
     public JevMessage Instructions => "Choose the destination best suited to the traveler.";
 
-    public IEnumerable<ChoiceCriteria> Choices =>
+    public ChoiceCriteria[] Choices =>
     [
         new("city", "Prefer museums, restaurants, and cultural attractions."),
         new("coast", "Prefer beaches and outdoor relaxation.")
@@ -56,11 +55,10 @@ public class DestinationQuestion
 }
 
 /// <summary>Provides instructions and ordered scoring levels for a score question.</summary>
-[ScoreQuestion]
-public class ComfortQuestion
+public class ComfortQuestion : IScoreQuestionDefinition<JevMessage>
 {
     public JevMessage Instructions => "Rate the comfort the traveler can afford.";
 
-    public IEnumerable<string> Criterias =>
+    public string[] Criterias =>
         ["Basic accommodation", "Comfortable accommodation", "Luxury accommodation"];
 }

@@ -17,21 +17,22 @@ AnsiConsole.MarkupLineInterpolated($"[green]{jevQuery.GetDangerZoneAnswer(respon
 public record FileData(string File, string Data);
 
 
-[NoulQuestion]
+/// <summary>Provides instructions and optional yes/no criteria for evaluating file content.</summary>
 public partial class QuestionDefinition : INoulQuestionDefinition<string[]>
 {
     public QuestionDefinition(string[] instructions)
     {
         Instructions = instructions;
+        Yes = "Hello";
     }
 
     public string[] Instructions { get; set; }
-    public string? Yes { get; set; }
-    public string? No { get; set; }
+    public string? Yes { get; }
+    public string? No { get; } = null;
 }
 
 
-[ChoiceQuestion]
+/// <summary>Provides instructions and ordered choices for classifying file content.</summary>
 public class ChoiceQuestionDefinition : IChoiceQuestionDefinition<string>
 {
     public ChoiceQuestionDefinition(string instructions, params ChoiceCriteria[] choices)
@@ -40,13 +41,12 @@ public class ChoiceQuestionDefinition : IChoiceQuestionDefinition<string>
         Choices = choices;
     }
 
-    public string Instructions { get;  }
-    public ChoiceCriteria[] Choices { get;  }
+    public string Instructions { get; }
+    public ChoiceCriteria[] Choices { get; }
 }
 
 /// <summary>Provides instructions and criteria for scoring the supplied file's information quality.</summary>
-[ScoreQuestion]
-public class ScoreQuestionDefinition : IScoreQuestionDefinition<string,string>
+public class ScoreQuestionDefinition : IScoreQuestionDefinition<string>
 {
     public ScoreQuestionDefinition(string instructions, params string[] criterias)
     {
@@ -67,12 +67,14 @@ public partial class JevQuery
         JevModel = JevModel.Latest;
         DangerZone = new QuestionDefinition(["Contains bla kind of text"])
         {
-           
+            //Yes = "The file contains filler or placeholder text such as 'bla'.",
+            //No = "The file contains meaningful text without filler or placeholder content."
         };
         ChoiceQuestionDefinition = new ChoiceQuestionDefinition(
             "Classify the text in the supplied file.",
             new ChoiceCriteria("Placeholder", "The text is filler or placeholder content, such as 'bla bla bla'."),
-            new ChoiceCriteria("Meaningful", "The text conveys meaningful information rather than placeholder content."));
+            new ChoiceCriteria("Meaningful",
+                "The text conveys meaningful information rather than placeholder content."));
         ScoreQuestionDefinition = new ScoreQuestionDefinition(
             "Score the information quality of the text in the supplied file.",
             "The text conveys meaningful information rather than filler or placeholder content.",
@@ -80,9 +82,9 @@ public partial class JevQuery
             "The text provides specific, useful details.");
     }
 
-    public FileData State { get; private set; }    
+    public FileData State { get; private set; }
     public JevModel JevModel { get; private set; }
-    
+
     public QuestionDefinition DangerZone { get; private set; }
     public ChoiceQuestionDefinition ChoiceQuestionDefinition { get; private set; }
     public ScoreQuestionDefinition ScoreQuestionDefinition { get; private set; }

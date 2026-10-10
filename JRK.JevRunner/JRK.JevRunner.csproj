@@ -6,8 +6,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>JRK.JevRunner</RootNamespace>
     <PackageId>JRK.JevRunner</PackageId>
-    <VersionPrefix>0.2.0</VersionPrefix>
-    <VersionPrefix>preview-01</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>    
     <Title>JRK JevRunner</Title>
     <Authors>Jeppe Roi Kristensen</Authors>
     <Description>Unofficial .NET client for Jev and the TypeSafe System One API. Submit application state and named questions, and consume typed responses.</Description>

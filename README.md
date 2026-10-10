@@ -61,8 +61,8 @@ Console.WriteLine(response.GetRequiredNoulAnswer("dog_was_jumped_over"));
 
 ## Generated queries
 
-Mark a partial class or record class with `[JevQuery]` and supply readable `State`
-and `JevModel` properties. Question properties implement one of
+Alternatively you can mark a partial class or record class with `[JevQuery]` and supply readable `State`
+and `JevModel` properties. Note that State can be a string, array or any object.  Question properties implement one of
 `INoulQuestionDefinition<TInstruction>`, `IChoiceQuestionDefinition<TInstruction>`,
 or `IScoreQuestionDefinition<TInstruction>` from `JRK.JevRunner.Annotation`.
 The generator adds `GetRequest()` and named typed answer accessors such as

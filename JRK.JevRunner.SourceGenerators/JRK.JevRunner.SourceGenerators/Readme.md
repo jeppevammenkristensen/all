@@ -10,19 +10,45 @@ classes and record classes annotated with `JRK.JevRunner.Annotation.JevQueryAttr
 - Supply readable instance properties named `State` and `JevModel`, compatible with
   the runtime `Request` constructor.
 - Each question property has a type annotated with an attribute implementing
-  `IQuestionAttribute`, such as `[NoulQuestion]`. That type supplies a readable
+  `IQuestionAttribute`, such as `[NoulQuestion]`, `[ChoiceQuestion]`, or
+  `[ScoreQuestion]`. That type supplies a readable
   instance `Instructions` property compatible with its question builder.
 - A supported marker `{Prefix}QuestionAttribute` maps to
   `Requests.{Prefix}QuestionBuilder`, `Responses.{Prefix}Answer`, and
   `Response.GetRequired{Prefix}Answer(string)`.
 
+### Strict question configuration contract
+
+| Marker | Required readable instance properties | Generated configuration |
+| --- | --- | --- |
+| `[NoulQuestion]` | `Instructions` | Construct `NoulQuestionBuilder` |
+| `[ChoiceQuestion]` | `Instructions`, `Choices` assignable to `IEnumerable<JRK.JevRunner.Requests.ChoiceCriteria>` | Call `AddChoice(item.Choice, item.Instruction)` for each entry |
+| `[ScoreQuestion]` | `Instructions`, `Criterias` assignable to `IEnumerable<string>` | Call `AddCriteria(item)` for each entry |
+
+`Instructions` must be compatible with the builder constructor (the runtime accepts
+`JevMessage`, including its implicit conversion from strings). `ChoiceCriteria`
+is the runtime type with `Choice` and `Instruction` string properties; structurally
+similar custom types are not substitutes. The score collection is named **`Criterias`**,
+matching the runtime API. Arrays, lists, and other collections implementing the
+required generic enumerable contract are supported.
+
+The generator enumerates each collection in its supplied order and fully configures
+the builder before adding the question to the request. Empty collections add no
+entries. Properties must be accessible, non-static, non-indexed, and have an accessible
+getter; fields and write-only properties do not satisfy this contract. Missing or
+unreadable properties produce JEV002. Incompatible collection or instruction types
+produce JEV004 through binding of the emitted code to the runtime API.
+
 For a question property named `Budget`, the generated `GetRequest()` adds a
 question named `Budget`, and `GetBudgetAnswer(Response)` retrieves that named
-typed answer. Question names come from property identifiers, not their types.
+typed answer. Choice and score accessors return the full `ChoiceAnswer` and
+`ScoreAnswer` objects, including probabilities and confidence, rather than just a
+selected string or numeric score. Question names come from property identifiers, not their types.
 Existing members must not collide with these generated method names.
 
 See [Examples.cs](../JRK.JevRunner.SourceGenerators.Sample/Examples.cs) for a
-complete noul example that consumes both generated methods.
+complete mixed noul, choice, and score example that constructs a request and consumes
+all three typed answer accessors against the actual runtime API.
 
 ## Diagnostics
 

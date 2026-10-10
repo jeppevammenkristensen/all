@@ -18,13 +18,45 @@ public record FileData(string File, string Data);
 
 
 [NoulQuestion]
-public partial class Question
+public partial class QuestionDefinition : INoulQuestionDefinition<string[]>
 {
+    public QuestionDefinition(string[] instructions)
+    {
+        Instructions = instructions;
+    }
+
     public string[] Instructions { get; set; }
-    public string Yes { get; set; }
-    public string No { get; set; }
+    public string? Yes { get; set; }
+    public string? No { get; set; }
 }
 
+
+[ChoiceQuestion]
+public class ChoiceQuestionDefinition : IChoiceQuestionDefinition<string>
+{
+    public ChoiceQuestionDefinition(string instructions, params ChoiceCriteria[] choices)
+    {
+        Instructions = instructions;
+        Choices = choices;
+    }
+
+    public string Instructions { get;  }
+    public ChoiceCriteria[] Choices { get;  }
+}
+
+/// <summary>Provides instructions and criteria for scoring the supplied file's information quality.</summary>
+[ScoreQuestion]
+public class ScoreQuestionDefinition : IScoreQuestionDefinition<string,string>
+{
+    public ScoreQuestionDefinition(string instructions, params string[] criterias)
+    {
+        Instructions = instructions;
+        Criterias = criterias;
+    }
+
+    public string Instructions { get; }
+    public string[] Criterias { get; }
+}
 
 [JevQuery]
 public partial class JevQuery
@@ -33,16 +65,25 @@ public partial class JevQuery
     {
         State = state;
         JevModel = JevModel.Latest;
-        DangerZone = new Question()
+        DangerZone = new QuestionDefinition(["Contains bla kind of text"])
         {
-            Instructions = ["Contains bla kind of text"],
+           
         };
+        ChoiceQuestionDefinition = new ChoiceQuestionDefinition(
+            "Classify the text in the supplied file.",
+            new ChoiceCriteria("Placeholder", "The text is filler or placeholder content, such as 'bla bla bla'."),
+            new ChoiceCriteria("Meaningful", "The text conveys meaningful information rather than placeholder content."));
+        ScoreQuestionDefinition = new ScoreQuestionDefinition(
+            "Score the information quality of the text in the supplied file.",
+            "The text conveys meaningful information rather than filler or placeholder content.",
+            "The text is clear and understandable.",
+            "The text provides specific, useful details.");
     }
 
     public FileData State { get; private set; }    
     public JevModel JevModel { get; private set; }
     
-    public Question DangerZone { get; private set; }
+    public QuestionDefinition DangerZone { get; private set; }
+    public ChoiceQuestionDefinition ChoiceQuestionDefinition { get; private set; }
+    public ScoreQuestionDefinition ScoreQuestionDefinition { get; private set; }
 }
-
-

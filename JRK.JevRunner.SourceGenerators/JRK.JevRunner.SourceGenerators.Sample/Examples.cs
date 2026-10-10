@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using JRK.JevRunner.Annotation;
 using JRK.JevRunner.Requests;
 using JRK.JevRunner.Responses;
@@ -9,20 +10,29 @@ namespace JRK.JevRunner.SourceGenerators.Sample;
 /// </summary>
 public static class Examples
 {
-    /// <summary>Creates a request with a named noul question.</summary>
+    /// <summary>Creates a request with named noul, choice, and score questions.</summary>
     public static Request CreateRequest() => new BudgetQuery().GetRequest();
 
     /// <summary>Retrieves the typed answer for the Budget question from an existing response.</summary>
     public static NoulAnswer ReadBudgetAnswer(Response response) => new BudgetQuery().GetBudgetAnswer(response);
+
+    /// <summary>Retrieves the complete choice answer, including its probabilities and confidence.</summary>
+    public static ChoiceAnswer ReadDestinationAnswer(Response response) =>
+        new BudgetQuery().GetDestinationAnswer(response);
+
+    /// <summary>Retrieves the complete score answer, including its legend probabilities and confidence.</summary>
+    public static ScoreAnswer ReadComfortAnswer(Response response) => new BudgetQuery().GetComfortAnswer(response);
 }
 
-/// <summary>Asks whether the supplied travel budget is sufficient.</summary>
+/// <summary>Asks about budget, destination, and comfort for the supplied travel state.</summary>
 [JevQuery]
 public partial class BudgetQuery
 {
     public JevMessage State => "The traveler has a budget of 500 EUR for a weekend trip.";
     public JevModel JevModel => global::JRK.JevRunner.Requests.JevModel.Latest;
     public BudgetQuestion Budget { get; } = new();
+    public DestinationQuestion Destination { get; } = new();
+    public ComfortQuestion Comfort { get; } = new();
 }
 
 /// <summary>Provides the instructions for a noul question.</summary>
@@ -30,4 +40,27 @@ public partial class BudgetQuery
 public class BudgetQuestion
 {
     public JevMessage Instructions => "Is the budget sufficient for travel, accommodation, and meals?";
+}
+
+/// <summary>Provides instructions and ordered selection criteria for a choice question.</summary>
+[ChoiceQuestion]
+public class DestinationQuestion
+{
+    public JevMessage Instructions => "Choose the destination best suited to the traveler.";
+
+    public IEnumerable<ChoiceCriteria> Choices =>
+    [
+        new("city", "Prefer museums, restaurants, and cultural attractions."),
+        new("coast", "Prefer beaches and outdoor relaxation.")
+    ];
+}
+
+/// <summary>Provides instructions and ordered scoring levels for a score question.</summary>
+[ScoreQuestion]
+public class ComfortQuestion
+{
+    public JevMessage Instructions => "Rate the comfort the traveler can afford.";
+
+    public IEnumerable<string> Criterias =>
+        ["Basic accommodation", "Comfortable accommodation", "Luxury accommodation"];
 }

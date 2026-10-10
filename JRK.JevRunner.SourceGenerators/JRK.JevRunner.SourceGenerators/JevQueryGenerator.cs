@@ -134,7 +134,23 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
                 continue;
             }
 
-            questions.Add(new QuestionMapping(property, builder, answer, accessor));
+            var configuration = prefix == "Choice" ? ConfigurationKind.Choice :
+                prefix == "Score" ? ConfigurationKind.Score : ConfigurationKind.None;
+            var collectionName = configuration == ConfigurationKind.Choice ? "Choices" : "Criterias";
+            if (configuration != ConfigurationKind.None)
+            {
+                var collection = Properties((INamedTypeSymbol) property.Type)
+                    .FirstOrDefault(candidate => candidate.Name == collectionName);
+                if (collection == null || !Readable(collection, type, compilation))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(InvalidProperty, propertyLocation, type.Name,
+                        $"'{property.Name}.{collectionName}' must be a readable, accessible instance property"));
+                    valid = false;
+                    continue;
+                }
+            }
+
+            questions.Add(new QuestionMapping(property, builder, answer, accessor, configuration));
         }
 
         foreach (var name in new[] {"GetRequest"}.Concat(questions.Select(question =>
@@ -223,32 +239,61 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
             source.AppendLine(" {");
         }
 
+        var localNames = new HashSet<string>(containers.SelectMany(container => container.TypeParameters)
+            .Select(parameter => parameter.Name), StringComparer.Ordinal);
+        var request = LocalName("request", localNames);
         source.AppendLine(
-                "/// <summary>Creates a request from this query's state, model, and question instructions.</summary>")
+                "/// <summary>Creates a request from this query's state, model, instructions, and ordered question configuration.</summary>")
             .AppendLine("/// <returns>A new request containing each annotated question.</returns>")
             .AppendLine("public global::JRK.JevRunner.Request GetRequest() {")
-            .AppendLine("var request = new global::JRK.JevRunner.Request(this.@State, this.@JevModel);");
-        foreach (var question in questions)
+            .Append("var ").Append(request)
+            .AppendLine(" = new global::JRK.JevRunner.Request(this.@State, this.@JevModel);");
+        for (var index = 0; index < questions.Count; index++)
         {
+            var question = questions[index];
             var property = Identifier(question.Property.Name);
-            source.Append("global::JRK.JevRunner.Requests.RequestExtensions.AddQuestion(request, new ")
+            var constructor = new StringBuilder("new ")
                 .Append(question.Builder.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
                 .Append("(nameof(this.").Append(property).Append("), this.").Append(property)
-                .AppendLine(".@Instructions));");
+                .Append(".@Instructions)").ToString();
+            if (question.Configuration == ConfigurationKind.None)
+            {
+                source.Append("global::JRK.JevRunner.Requests.RequestExtensions.AddQuestion(")
+                    .Append(request).Append(", ").Append(constructor).AppendLine(");");
+                continue;
+            }
+
+            var builder = LocalName("__jevQuestion" + index, localNames);
+            var items = LocalName("__jevItems" + index, localNames);
+            var item = LocalName("__jevItem" + index, localNames);
+            var choice = question.Configuration == ConfigurationKind.Choice;
+            source.Append("var ").Append(builder).Append(" = ").Append(constructor).AppendLine(";")
+                .Append("global::System.Collections.Generic.IEnumerable<")
+                .Append(choice ? "global::JRK.JevRunner.Requests.ChoiceCriteria" : "global::System.String")
+                .Append("> ").Append(items).Append(" = this.").Append(property)
+                .Append(choice ? ".@Choices" : ".@Criterias").AppendLine(";")
+                .Append("foreach (var ").Append(item).Append(" in ").Append(items).AppendLine(") {")
+                .Append(builder).Append(choice ? ".@AddChoice(" : ".@AddCriteria(").Append(item)
+                .Append(choice ? ".@Choice, " + item + ".@Instruction" : "").AppendLine(");\n}")
+                .Append("global::JRK.JevRunner.Requests.RequestExtensions.AddQuestion(")
+                .Append(request).Append(", ").Append(builder).AppendLine(");");
         }
 
-        source.AppendLine("return request;\n}");
+        source.Append("return ").Append(request).AppendLine(";\n}");
+        var response = LocalName("response", localNames);
         foreach (var question in questions)
         {
             source.AppendLine(
                     "/// <summary>Returns the required typed answer for this query's named question.</summary>")
-                .AppendLine("/// <param name=\"response\">The response containing the named answer.</param>")
+                .Append("/// <param name=\"").Append(response)
+                .AppendLine("\">The response containing the named answer.</param>")
                 .AppendLine(
                     "/// <returns>The answer; the response lookup throws if it is missing or has another type.</returns>")
                 .Append("public ").Append(question.Answer.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
                 .Append(' ').Append(Identifier("Get" + question.Property.Name + "Answer"))
-                .AppendLine("(global::JRK.JevRunner.Response response) {")
-                .Append("return response.").Append(Identifier(question.Accessor)).Append("(nameof(this.")
+                .Append("(global::JRK.JevRunner.Response ").Append(response).AppendLine(") {")
+                .Append("return ").Append(response).Append('.').Append(Identifier(question.Accessor))
+                .Append("(nameof(this.")
                 .Append(Identifier(question.Property.Name)).AppendLine("));\n}");
         }
 
@@ -259,20 +304,46 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
         return source.ToString();
     }
 
+    /// <summary>
+    /// Allocates a generated local or parameter name without shadowing containing type parameters.
+    /// </summary>
+    private static string LocalName(string preferred, HashSet<string> names)
+    {
+        var name = preferred;
+        while (!names.Add(name))
+            name += "_";
+        return name;
+    }
+
+    /// <summary>
+    /// Identifies the additional collection configuration required before a question is added.
+    /// </summary>
+    private enum ConfigurationKind
+    {
+        None,
+        Choice,
+        Score
+    }
+
+    /// <summary>
+    /// Couples a query property with its builder, typed response lookup, and configuration contract.
+    /// </summary>
     private sealed class QuestionMapping
     {
         public QuestionMapping(IPropertySymbol property, INamedTypeSymbol builder, INamedTypeSymbol answer,
-            string accessor)
+            string accessor, ConfigurationKind configuration)
         {
             Property = property;
             Builder = builder;
             Answer = answer;
             Accessor = accessor;
+            Configuration = configuration;
         }
 
         public IPropertySymbol Property { get; }
         public INamedTypeSymbol Builder { get; }
         public INamedTypeSymbol Answer { get; }
         public string Accessor { get; }
+        public ConfigurationKind Configuration { get; }
     }
 }

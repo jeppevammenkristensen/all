@@ -6,13 +6,14 @@
     <Nullable>enable</Nullable>
     <RootNamespace>JRK.JevRunner</RootNamespace>
     <PackageId>JRK.JevRunner</PackageId>
-    <Version>0.1.0</Version>
+    <VersionPrefix>0.2.0</VersionPrefix>
+    <VersionPrefix>preview-01</VersionPrefix>
     <Title>JRK JevRunner</Title>
     <Authors>Jeppe Roi Kristensen</Authors>
     <Description>Unofficial .NET client for Jev and the TypeSafe System One API. Submit application state and named questions, and consume typed responses.</Description>
     <PackageTags>jev;typesafe;ai;system-one;api-client;dotnet</PackageTags>
     <PackageProjectUrl>https://github.com/jeppevammenkristensen/all</PackageProjectUrl>
-    <PackageReleaseNotes>Added Usage to the response</PackageReleaseNotes>
+    <PackageReleaseNotes>Add support for using source generators to generate Requests and Answers in a partial class</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/jeppevammenkristensen/all</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

@@ -6,13 +6,36 @@ An unofficial .NET client for Jev and the TypeSafe System One API. Submit applic
 
 ## Requirements
 
-- .NET 11
+- .NET 11 or later
 - A TypeSafe API key
 
 ## Installation
 
 ```shell
 dotnet add package JRK.JevRunner
+```
+
+The package includes its source generators automatically; no separate generator package or
+analyzer reference is needed when consuming it through NuGet. The generator assembly targets
+`netstandard2.0` for compiler-host compatibility, while the client targets `net11.0`.
+
+For repository development, analyzer project references are not transitive. See the sample
+project's explicit analyzer reference. Build and pack the client with:
+
+```shell
+dotnet pack JRK.JevRunner/JRK.JevRunner.csproj -c Release
+dotnet build JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators.Sample/JRK.JevRunner.SourceGenerators.Sample.csproj -c Release -p:UsePackedJevRunner=true
+```
+
+The second command is a build-only packaging smoke check: it consumes the locally packed
+NuGet without an explicit generator reference and compiles code that requires generated types.
+
+Package restores audit both direct and transitive dependencies and fail on known vulnerabilities
+or audit-feed failures. To repeat the advisory check:
+
+```shell
+dotnet restore all.slnx --force-evaluate
+dotnet package list --project all.slnx --vulnerable --include-transitive --no-restore
 ```
 
 ## Quick start

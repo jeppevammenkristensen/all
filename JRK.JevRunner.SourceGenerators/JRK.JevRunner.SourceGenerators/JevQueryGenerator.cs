@@ -16,7 +16,6 @@ namespace JRK.JevRunner.SourceGenerators;
 public sealed class JevQueryGenerator : IIncrementalGenerator
 {
     private const string QueryAttribute = "JRK.JevRunner.Annotation.JevQueryAttribute";
-    private const string QuestionAttribute = "JRK.JevRunner.Annotation.IQuestionAttribute";
 
     private static readonly DiagnosticDescriptor InvalidType = Descriptor("JEV001", "Invalid query declaration",
         "Query '{0}' must be a non-static partial class or record class; all containing types must also be non-file-local partial classes or record classes");
@@ -86,41 +85,69 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
             }
         }
 
-        var marker = compilation.GetTypeByMetadataName(QuestionAttribute);
+        var definitions = new[]
+        {
+            (Interface: compilation.GetTypeByMetadataName("JRK.JevRunner.Annotation.INoulQuestionDefinition`1"),
+                Builder: "JRK.JevRunner.Requests.NoulQuestionBuilder", Answer: "JRK.JevRunner.Responses.NoulAnswer",
+                Accessor: "GetRequiredNoulAnswer", Configuration: ConfigurationKind.Noul),
+            (Interface: compilation.GetTypeByMetadataName("JRK.JevRunner.Annotation.IChoiceQuestionDefinition`1"),
+                Builder: "JRK.JevRunner.Requests.ChoiceQuestionBuilder", Answer: "JRK.JevRunner.Responses.ChoiceAnswer",
+                Accessor: "GetRequiredChoiceAnswer", Configuration: ConfigurationKind.Choice),
+            (Interface: compilation.GetTypeByMetadataName("JRK.JevRunner.Annotation.IScoreQuestionDefinition`1"),
+                Builder: "JRK.JevRunner.Requests.ScoreQuestionBuilder", Answer: "JRK.JevRunner.Responses.ScoreAnswer",
+                Accessor: "GetRequiredScoreAnswer", Configuration: ConfigurationKind.Score)
+        };
         var questions = new List<QuestionMapping>();
         foreach (var property in properties)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
-            var attributes = property.Type.GetAttributes().Where(attribute =>
-                attribute.AttributeClass != null && marker != null &&
-                attribute.AttributeClass.AllInterfaces.Any(@interface =>
-                    SymbolEqualityComparer.Default.Equals(@interface, marker))).ToArray();
-            if (attributes.Length == 0)
+            var matches = QuestionInterfaces(property.Type).SelectMany(@interface => definitions
+                .Where(definition => definition.Interface != null && SymbolEqualityComparer.Default.Equals(
+                    @interface.OriginalDefinition, definition.Interface))
+                .Select(definition => (Interface: @interface, Definition: definition))).ToArray();
+            if (matches.Length == 0)
                 continue;
 
             var propertyLocation = property.Locations.FirstOrDefault() ?? location;
-            var instructions = property.Type is INamedTypeSymbol questionType
-                ? Properties(questionType).FirstOrDefault(candidate => candidate.Name == "Instructions")
-                : null;
-            if (!Readable(property, type, compilation) || instructions == null ||
-                !Readable(instructions, type, compilation))
+            if (matches.Length != 1)
             {
-                context.ReportDiagnostic(Diagnostic.Create(InvalidProperty, propertyLocation, type.Name,
-                    $"'{property.Name}' and its 'Instructions' must be readable, accessible instance properties"));
+                context.ReportDiagnostic(Diagnostic.Create(UnsupportedMapping, propertyLocation, property.Name,
+                    "expected exactly one supported question definition interface construction"));
                 valid = false;
                 continue;
             }
 
-            var attributeName = attributes.Length == 1 ? attributes[0].AttributeClass!.Name : "";
-            const string suffix = "QuestionAttribute";
-            var prefix = attributeName.EndsWith(suffix, StringComparison.Ordinal)
-                ? attributeName.Substring(0, attributeName.Length - suffix.Length)
-                : "";
-            var builder = compilation.GetTypeByMetadataName($"JRK.JevRunner.Requests.{prefix}QuestionBuilder");
-            var answer = compilation.GetTypeByMetadataName($"JRK.JevRunner.Responses.{prefix}Answer");
+            if (!Readable(property, type, compilation))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(InvalidProperty, propertyLocation, type.Name,
+                    $"'{property.Name}' must be a readable, accessible instance property"));
+                valid = false;
+                continue;
+            }
+
+            var match = matches[0];
+            // Invalid concrete implementations already produce compiler errors; report the missing
+            // interface member at the query too, without relying on concrete member names/accessibility.
+            var missing = property.Type is INamedTypeSymbol concrete && concrete.TypeKind != TypeKind.Interface
+                ? match.Interface.GetMembers().OfType<IPropertySymbol>().FirstOrDefault(member =>
+                    concrete.FindImplementationForInterfaceMember(member) is not IPropertySymbol implementation ||
+                    implementation.GetMethod == null ||
+                    (implementation.ExplicitInterfaceImplementations.Length == 0 &&
+                     implementation.GetMethod.DeclaredAccessibility != Accessibility.Public))
+                : null;
+            if (missing != null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(InvalidProperty, propertyLocation, type.Name,
+                    $"'{property.Name}' must implement '{missing.Name}' from its question definition interface"));
+                valid = false;
+                continue;
+            }
+
+            var builder = compilation.GetTypeByMetadataName(match.Definition.Builder);
+            var answer = compilation.GetTypeByMetadataName(match.Definition.Answer);
             var response = compilation.GetTypeByMetadataName("JRK.JevRunner.Response");
-            var accessor = "GetRequired" + prefix + "Answer";
-            if (prefix.Length == 0 || builder == null || answer == null || response == null ||
+            var accessor = match.Definition.Accessor;
+            if (builder == null || answer == null || response == null ||
                 !response.GetMembers(accessor).OfType<IMethodSymbol>().Any(method =>
                     !method.IsStatic && method.Arity == 0 && method.Parameters.Length == 1 &&
                     method.Parameters[0].Type.SpecialType == SpecialType.System_String &&
@@ -128,29 +155,13 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
                     compilation.IsSymbolAccessibleWithin(method, type)))
             {
                 context.ReportDiagnostic(Diagnostic.Create(UnsupportedMapping, propertyLocation, property.Name,
-                    "expected one {Prefix}QuestionAttribute marker, a Requests.{Prefix}QuestionBuilder, " +
-                    "a Responses.{Prefix}Answer, and Response.GetRequired{Prefix}Answer(string)"));
+                    $"expected {match.Definition.Builder}, {match.Definition.Answer}, and Response.{accessor}(string)"));
                 valid = false;
                 continue;
             }
 
-            var configuration = prefix == "Choice" ? ConfigurationKind.Choice :
-                prefix == "Score" ? ConfigurationKind.Score : ConfigurationKind.None;
-            var collectionName = configuration == ConfigurationKind.Choice ? "Choices" : "Criterias";
-            if (configuration != ConfigurationKind.None)
-            {
-                var collection = Properties((INamedTypeSymbol) property.Type)
-                    .FirstOrDefault(candidate => candidate.Name == collectionName);
-                if (collection == null || !Readable(collection, type, compilation))
-                {
-                    context.ReportDiagnostic(Diagnostic.Create(InvalidProperty, propertyLocation, type.Name,
-                        $"'{property.Name}.{collectionName}' must be a readable, accessible instance property"));
-                    valid = false;
-                    continue;
-                }
-            }
-
-            questions.Add(new QuestionMapping(property, builder, answer, accessor, configuration));
+            questions.Add(new QuestionMapping(property, match.Interface, builder, answer, accessor,
+                match.Definition.Configuration));
         }
 
         foreach (var name in new[] {"GetRequest"}.Concat(questions.Select(question =>
@@ -210,6 +221,32 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
         !property.IsStatic && !property.IsIndexer && property.ExplicitInterfaceImplementations.Length == 0 &&
         property.GetMethod != null && compilation.IsSymbolAccessibleWithin(property.GetMethod, within);
 
+    /// <summary>Enumerates distinct interface constructions, including the type itself and generic constraints.</summary>
+    private static IEnumerable<INamedTypeSymbol> QuestionInterfaces(ITypeSymbol type)
+    {
+        var seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var pending = new Stack<ITypeSymbol>();
+        pending.Push(type);
+        while (pending.Count != 0)
+        {
+            var current = pending.Pop();
+            if (!seen.Add(current))
+                continue;
+            if (current is INamedTypeSymbol named)
+            {
+                if (named.TypeKind == TypeKind.Interface)
+                    yield return named;
+                foreach (var inherited in named.AllInterfaces)
+                    pending.Push(inherited);
+            }
+            else if (current is ITypeParameterSymbol parameter)
+            {
+                foreach (var constraint in parameter.ConstraintTypes)
+                    pending.Push(constraint);
+            }
+        }
+    }
+
     private static string Identifier(string name) => "@" + name;
 
     /// <summary>
@@ -244,7 +281,7 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
         var request = LocalName("request", localNames);
         source.AppendLine(
                 "/// <summary>Creates a request from this query's state, model, instructions, and ordered question configuration.</summary>")
-            .AppendLine("/// <returns>A new request containing each annotated question.</returns>")
+            .AppendLine("/// <returns>A new request containing each interface-defined question.</returns>")
             .AppendLine("public global::JRK.JevRunner.Request GetRequest() {")
             .Append("var ").Append(request)
             .AppendLine(" = new global::JRK.JevRunner.Request(this.@State, this.@JevModel);");
@@ -252,25 +289,36 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
         {
             var question = questions[index];
             var property = Identifier(question.Property.Name);
+            var definition = LocalName("__jevDefinition" + index, localNames);
+            source.Append("var ").Append(definition).Append(" = (")
+                .Append(question.Interface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+                .Append(")this.").Append(property).AppendLine(";");
             var constructor = new StringBuilder("new ")
                 .Append(question.Builder.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-                .Append("(nameof(this.").Append(property).Append("), this.").Append(property)
+                .Append("(nameof(this.").Append(property).Append("), ").Append(definition)
                 .Append(".@Instructions)").ToString();
-            if (question.Configuration == ConfigurationKind.None)
+            var builder = LocalName("__jevQuestion" + index, localNames);
+            source.Append("var ").Append(builder).Append(" = ").Append(constructor).AppendLine(";");
+            if (question.Configuration == ConfigurationKind.Noul)
             {
+                var yes = LocalName("__jevYes" + index, localNames);
+                var no = LocalName("__jevNo" + index, localNames);
+                source.Append("var ").Append(yes).Append(" = ").Append(definition).AppendLine(".@Yes;")
+                    .Append("var ").Append(no).Append(" = ").Append(definition).AppendLine(".@No;")
+                    .Append("if (").Append(yes).Append(" != null && ").Append(no).AppendLine(" != null) {")
+                    .Append(builder).Append(".@AddYesNo(").Append(yes).Append(", ").Append(no).AppendLine(");")
+                    .AppendLine("}");
                 source.Append("global::JRK.JevRunner.Requests.RequestExtensions.AddQuestion(")
-                    .Append(request).Append(", ").Append(constructor).AppendLine(");");
+                    .Append(request).Append(", ").Append(builder).AppendLine(");");
                 continue;
             }
 
-            var builder = LocalName("__jevQuestion" + index, localNames);
             var items = LocalName("__jevItems" + index, localNames);
             var item = LocalName("__jevItem" + index, localNames);
             var choice = question.Configuration == ConfigurationKind.Choice;
-            source.Append("var ").Append(builder).Append(" = ").Append(constructor).AppendLine(";")
-                .Append("global::System.Collections.Generic.IEnumerable<")
+            source.Append("global::System.Collections.Generic.IEnumerable<")
                 .Append(choice ? "global::JRK.JevRunner.Requests.ChoiceCriteria" : "global::System.String")
-                .Append("> ").Append(items).Append(" = this.").Append(property)
+                .Append("> ").Append(items).Append(" = ").Append(definition)
                 .Append(choice ? ".@Choices" : ".@Criterias").AppendLine(";")
                 .Append("foreach (var ").Append(item).Append(" in ").Append(items).AppendLine(") {")
                 .Append(builder).Append(choice ? ".@AddChoice(" : ".@AddCriteria(").Append(item)
@@ -316,11 +364,11 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Identifies the additional collection configuration required before a question is added.
+    /// Identifies the criteria or choice configuration required before a question is added.
     /// </summary>
     private enum ConfigurationKind
     {
-        None,
+        Noul,
         Choice,
         Score
     }
@@ -330,10 +378,12 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
     /// </summary>
     private sealed class QuestionMapping
     {
-        public QuestionMapping(IPropertySymbol property, INamedTypeSymbol builder, INamedTypeSymbol answer,
+        public QuestionMapping(IPropertySymbol property, INamedTypeSymbol @interface, INamedTypeSymbol builder,
+            INamedTypeSymbol answer,
             string accessor, ConfigurationKind configuration)
         {
             Property = property;
+            Interface = @interface;
             Builder = builder;
             Answer = answer;
             Accessor = accessor;
@@ -341,6 +391,7 @@ public sealed class JevQueryGenerator : IIncrementalGenerator
         }
 
         public IPropertySymbol Property { get; }
+        public INamedTypeSymbol Interface { get; }
         public INamedTypeSymbol Builder { get; }
         public INamedTypeSymbol Answer { get; }
         public string Accessor { get; }

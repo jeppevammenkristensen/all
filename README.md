@@ -59,6 +59,54 @@ var response = await runner.Execute(request);
 Console.WriteLine(response.GetRequiredNoulAnswer("dog_was_jumped_over"));
 ```
 
+## Generated queries
+
+Mark a partial class or record class with `[JevQuery]` and supply readable `State`
+and `JevModel` properties. Question properties implement one of
+`INoulQuestionDefinition<TInstruction>`, `IChoiceQuestionDefinition<TInstruction>`,
+or `IScoreQuestionDefinition<TInstruction>` from `JRK.JevRunner.Annotation`.
+The generator adds `GetRequest()` and named typed answer accessors such as
+`GetBudgetAnswer(Response)`.
+
+For example, using the `runner` initialized in the quick start:
+
+```csharp
+using JRK.JevRunner.Annotation;
+using JRK.JevRunner.Requests;
+
+var query = new AnimalQuery();
+var response = await runner.Execute(query.GetRequest());
+Console.WriteLine(query.GetDogJumpedOverAnswer(response));
+
+[JevQuery]
+public partial class AnimalQuery
+{
+    public string State => "The brown fox jumped over the lazy dog.";
+    public JevModel JevModel => global::JRK.JevRunner.Requests.JevModel.Latest;
+    public JumpQuestion DogJumpedOver { get; } = new();
+}
+
+public class JumpQuestion : INoulQuestionDefinition<string>
+{
+    public string Instructions => "Did any animal jump over a lazy dog?";
+    public string? Yes => "An animal jumped over a lazy dog.";
+    public string? No => "No animal jumped over a lazy dog.";
+}
+```
+
+`GetRequest()` and `GetDogJumpedOverAnswer(Response)` are generated automatically.
+Criteria are generated only when both `Yes` and `No` are non-null; otherwise
+criteria remain unset.
+
+Question attributes have been replaced by definition interfaces. Choice definitions
+provide `ChoiceCriteria[] Choices`; score definitions provide `string[] Criterias`
+and now have only the instruction generic parameter. Noul definitions provide
+optional `Yes` and `No` descriptions: both must be non-null to generate criteria.
+If either is null, the runtime omits the JSON `criteria` member.
+
+See the [generator contract and diagnostics](JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators/Readme.md)
+and the [mixed-query sample](JRK.JevRunner.SourceGenerators/JRK.JevRunner.SourceGenerators.Sample/Examples.cs).
+
 This package is targeting C# 15 and dotnet sdk which is currently in the time of writing in preview
 
 ## License
